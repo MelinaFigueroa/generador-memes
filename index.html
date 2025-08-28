@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Generador de Memes — Con Plantillas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fuentes comunes para memes -->
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    html, body { height: 100%; }
+    /* Cursor de arrastre cuando hay capa seleccionada */
+    #stage.dragging { cursor: grabbing; }
+    #stage { touch-action: none; }
+    .template-card:hover { transform: scale(1.05); transition: transform 0.2s; }
+    .template-card { cursor: pointer; transition: transform 0.2s; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <header class="p-4 md:p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+    <div class="max-w-6xl mx-auto">
+      <h1 class="text-2xl md:text-3xl font-bold">🔥 Generador de Memes Pro</h1>
+      <p class="text-purple-100">Elige una plantilla popular o usa tu propia imagen. Arrastra textos y descarga en PNG.</p>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 md:px-6 py-6">
+    <!-- Sección de plantillas -->
+    <section class="mb-8">
+      <div class="bg-white rounded-2xl shadow-lg p-6">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">📱 Plantillas Populares</h2>
+        <div id="templatesGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+          <!-- Las plantillas se cargan dinámicamente aquí -->
+        </div>
+        
+        <div class="mt-6 pt-4 border-t border-gray-200">
+          <h3 class="text-lg font-semibold mb-3 text-gray-700">🔗 O usa tu propia imagen</h3>
+          <div class="flex flex-col md:flex-row gap-3">
+            <input id="imgUrl" type="url" placeholder="Pega la URL de tu imagen (https://...)" 
+                   class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <button id="loadImg" class="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+              Cargar Imagen
+            </button>
+          </div>
+          <p class="text-sm text-gray-500 mt-2">
+            💡 Tip: Las imágenes de Unsplash funcionan bien. Si no se descarga, puede ser por políticas CORS del servidor.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Panel izquierdo: imagen y canvas -->
+      <section class="lg:col-span-8">
+        <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-gray-800">🎨 Editor</h2>
+            <div class="flex items-center gap-3">
+              <label class="text-sm text-gray-600">Zoom</label>
+              <input id="zoomRange" type="range" min="20" max="150" value="100" class="w-32">
+              <span id="zoomLabel" class="text-sm text-gray-700 min-w-[50px]">100%</span>
+            </div>
+          </div>
+
+          <!-- Stage -->
+          <div class="relative bg-gray-200 rounded-lg overflow-auto border-2 border-dashed border-gray-300">
+            <canvas id="stage" class="block mx-auto bg-white rounded"></canvas>
+          </div>
+
+          <div class="flex flex-wrap gap-3 pt-2">
+            <button id="addText" class="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md">
+              ➕ Agregar Texto
+            </button>
+            <button id="download" class="px-4 py-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all shadow-md">
+              💾 Descargar PNG
+            </button>
+            <button id="clearAll" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition-colors">
+              🗑️ Limpiar Todo
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel derecho: propiedades de capa -->
+      <aside class="lg:col-span-4">
+        <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6 space-y-5">
+          <h2 class="text-lg font-semibold text-gray-800">📝 Capas de Texto</h2>
+          <div id="layers" class="space-y-2 max-h-40 overflow-y-auto"></div>
+
+          <hr class="border-gray-200">
+
+          <h3 class="text-lg font-semibold text-gray-800">⚙️ Propiedades</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Texto</label>
+              <textarea id="propText" rows="3" placeholder="Escribe tu texto aquí..." 
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fuente</label>
+                <select id="propFont" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                  <option value="Anton">Anton (Meme clásico)</option>
+                  <option value="Impact, Anton, Arial Black, sans-serif">Impact-like</option>
+                  <option value="Montserrat">Montserrat</option>
+                  <option value="Inter">Inter</option>
+                  <option value="Arial Black, sans-serif">Arial Black</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tamaño</label>
+                <input id="propSize" type="number" min="8" max="300" value="64" 
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Color del texto</label>
+                <input id="propFill" type="color" value="#ffffff" 
+                       class="w-full h-10 border border-gray-300 rounded-lg cursor-pointer">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Color del borde</label>
+                <input id="propStroke" type="color" value="#000000" 
+                       class="w-full h-10 border border-gray-300 rounded-lg cursor-pointer">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Grosor borde</label>
+                <input id="propStrokeW" type="range" min="0" max="20" value="6" 
+                       class="w-full">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ancho máximo (%)</label>
+                <input id="propMaxW" type="range" min="30" max="100" value="90" 
+                       class="w-full">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fondo</label>
+                <input id="propBg" type="color" value="#000000" 
+                       class="w-full h-10 border border-gray-300 rounded-lg cursor-pointer">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Opacidad fondo</label>
+                <input id="propBgA" type="range" min="0" max="100" value="0" 
+                       class="w-full">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Alineación</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button data-align="left" class="alignBtn px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm transition-colors">
+                  ⬅️ Izquierda
+                </button>
+                <button data-align="center" class="alignBtn px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm transition-colors">
+                  ⬆️ Centro
+                </button>
+                <button data-align="right" class="alignBtn px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm transition-colors">
+                  ➡️ Derecha
+                </button>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button id="toFront" class="px-3 py-2 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 w-full text-sm transition-colors">
+                ⬆️ Al Frente
+              </button>
+              <button id="toBack" class="px-3 py-2 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 w-full text-sm transition-colors">
+                ⬇️ Al Fondo
+              </button>
+            </div>
+
+            <button id="deleteLayer" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full transition-colors">
+              🗑️ Eliminar Capa
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="text-center text-sm text-gray-500 py-8 bg-gray-50 mt-12">
+    <p>🚀 Generador de Memes Pro - Hecho con HTML + Tailwind + JS</p>
+    <p class="text-xs mt-2">💡 Tip: Haz clic en una plantilla, agrega texto, arrastra para mover y descarga tu meme</p>
+  </footer>
+
+  <script>
+    // --------- Plantillas de memes populares ---------
+    const templates = [
+      // Clásicos populares
+      { name: "Drake Hotline Bling", url: "https://i.imgflip.com/30b1gx.jpg" },
+      { name: "Distracted Boyfriend", url: "https://i.imgflip.com/1ur9b0.jpg" },
+      { name: "Two Buttons", url: "https://i.imgflip.com/1g8my4.jpg" },
+      { name: "Change My Mind", url: "https://i.imgflip.com/24y43o.jpg" },
+      { name: "Mocking SpongeBob", url: "https://i.imgflip.com/1otk96.jpg" },
+      
+      // Reacciones y decisiones
+      { name: "Woman Yelling at Cat", url: "https://i.imgflip.com/345v97.jpg" },
+      { name: "Running Away Balloon", url: "https://i.imgflip.com/261o3j.jpg" },
+      { name: "Left Exit 12 Off Ramp", url: "https://i.imgflip.com/22bdq6.jpg" },
+      { name: "UNO Draw 25 Cards", url: "https://i.imgflip.com/3lmzyx.jpg" },
+      { name: "This Is Fine", url: "https://i.imgflip.com/26am.jpg" },
+      
+      // Pensamiento y evolución
+      { name: "Expanding Brain", url: "https://i.imgflip.com/1jwhww.jpg" },
+      { name: "Galaxy Brain", url: "https://i.imgflip.com/2h7h39.jpg" },
+      { name: "Philosoraptor", url: "https://i.imgflip.com/1bgs.jpg" },
+      { name: "Ancient Aliens", url: "https://i.imgflip.com/26am.jpg" },
+      
+      // Políticos y famosos
+      { name: "Bernie I Am Once Again Asking", url: "https://i.imgflip.com/26tk.jpg" },
+      { name: "Leonardo Dicaprio Cheers", url: "https://i.imgflip.com/39t1o.jpg" },
+      { name: "Obama Medal", url: "https://i.imgflip.com/2vop8v.jpg" },
+      { name: "Trump Small Hands", url: "https://i.imgflip.com/28j0te.jpg" },
+      
+      // Animales
+      { name: "Grumpy Cat", url: "https://i.imgflip.com/30b1gx.jpg" },
+      { name: "Success Kid", url: "https://i.imgflip.com/1bhk.jpg" },
+      { name: "Evil Kermit", url: "https://i.imgflip.com/1e7ql7.jpg" },
+      { name: "Surprised Pikachu", url: "https://i.imgflip.com/2kbn1e.jpg" },
+      
+      // Situaciones
+      { name: "Hide the Pain Harold", url: "https://i.imgflip.com/gk5el.jpg" },
+      { name: "Disaster Girl", url: "https://i.imgflip.com/23ls.jpg" },
+      { name: "Overly Attached Girlfriend", url: "https://i.imgflip.com/1e478.jpg" },
+      { name: "Bad Luck Brian", url: "https://i.imgflip.com/1bip.jpg" },
+      
+      // Trabajo y estudios
+      { name: "First World Problems", url: "https://i.imgflip.com/1bhf.jpg" },
+      { name: "One Does Not Simply", url: "https://i.imgflip.com/1bij.jpg" },
+      { name: "Y U No", url: "https://i.imgflip.com/1bh8.jpg" },
+      { name: "Matrix Morpheus", url: "https://i.imgflip.com/25w3.jpg" },
+      
+      // Modernos y trending
+      { name: "Panik Kalm Panik", url: "https://i.imgflip.com/3qqcim.jpg" },
+      { name: "Stonks", url: "https://i.imgflip.com/2ze47r.jpg" },
+      { name: "Always Has Been", url: "https://i.imgflip.com/3lmzyx.jpg" },
+      { name: "Chad Yes", url: "https://i.imgflip.com/5c7lwq.jpg" },
+      
+      // Comparaciones
+      { name: "Drake Pointing", url: "https://i.imgflip.com/30b1gx.jpg" },
+      { name: "Buff Doge vs Cheems", url: "https://i.imgflip.com/43a45p.jpg" },
+      { name: "Virgin vs Chad", url: "https://i.imgflip.com/2oqkjo.jpg" },
+      { name: "Brain Levels", url: "https://i.imgflip.com/1jwhww.jpg" },
+      
+      // Clásicos de internet
+      { name: "Rickroll Never Gonna Give You Up", url: "https://i.imgflip.com/24y43o.jpg" },
+      { name: "Doge", url: "https://i.imgflip.com/4t0m5.jpg" },
+      { name: "Troll Face", url: "https://i.imgflip.com/2hgfw.jpg" },
+      { name: "Me Gusta", url: "https://i.imgflip.com/c6re.jpg" }
+    ];
+
+    // --------- Estado ---------
+    const stage = document.getElementById('stage');
+    const ctx = stage.getContext('2d');
+
+    const templatesGrid = document.getElementById('templatesGrid');
+    const imgUrl = document.getElementById('imgUrl');
+    const loadImgBtn = document.getElementById('loadImg');
+    const zoomRange = document.getElementById('zoomRange');
+    const zoomLabel = document.getElementById('zoomLabel');
+
+    const addTextBtn = document.getElementById('addText');
+    const downloadBtn = document.getElementById('download');
+    const clearAllBtn = document.getElementById('clearAll');
+
+    const layersDiv = document.getElementById('layers');
+    const propText = document.getElementById('propText');
+    const propFont = document.getElementById('propFont');
+    const propSize = document.getElementById('propSize');
+    const propFill = document.getElementById('propFill');
+    const propStroke = document.getElementById('propStroke');
+    const propStrokeW = document.getElementById('propStrokeW');
+    const propMaxW = document.getElementById('propMaxW');
+    const propBg = document.getElementById('propBg');
+    const propBgA = document.getElementById('propBgA');
+    const alignBtns = document.querySelectorAll('.alignBtn');
+    const toFrontBtn = document.getElementById('toFront');
+    const toBackBtn = document.getElementById('toBack');
+    const deleteLayerBtn = document.getElementById('deleteLayer');
+
+    let image = new Image();
+    image.crossOrigin = "anonymous"; // importante para poder descargar
+    let baseWidth = 800; // tamaño base si no hay imagen
+    let baseHeight = 600;
+    let zoom = 1;
+    let layers = []; // text objects
+    let selectedId = null;
+
+    // Cada capa de texto
+    const makeLayer = (text = "TEXTO NUEVO") => ({
+      id: crypto.randomUUID(),
+      text,
+      x: (stage.width * 0.5),
+      y: (stage.height * 0.15),
+      fontFamily: "Anton",
+      fontSize: Math.max(32, Math.floor(stage.width * 0.06)),
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeW: 6,
+      align: "center",
+      maxWpct: 90, // ancho máximo en % del canvas
+      bg: "#000000",
+      bgA: 0, // 0..100
+    });
+
+    // --------- Crear galería de plantillas ---------
+    function createTemplatesGrid() {
+      templatesGrid.innerHTML = '';
+      templates.forEach((template, index) => {
+        const card = document.createElement('div');
+        card.className = 'template-card bg-gray-50 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg';
+        
+        card.innerHTML = `
+          <div class="aspect-square relative">
+            <img src="${template.url}" alt="${template.name}" 
+                 class="w-full h-full object-cover" 
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 400 300\\'%3E%3Crect width=\\'400\\' height=\\'300\\' fill=\\'%23ddd\\'/%3E%3Ctext x=\\'200\\' y=\\'150\\' text-anchor=\\'middle\\' fill=\\'%23999\\' font-size=\\'16\\'%3EImagen no disponible%3C/text%3E%3C/svg%3E'">
+            <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all flex items-center justify-center">
+              <div class="text-white font-bold text-lg opacity-0 hover:opacity-100 transition-opacity">
+                Usar Template
+              </div>
+            </div>
+          </div>
+          <div class="p-2">
+            <h3 class="text-xs font-medium text-gray-800 truncate">${template.name}</h3>
+          </div>
+        `;
+        
+        card.addEventListener('click', () => loadTemplate(template));
+        templatesGrid.appendChild(card);
+      });
+    }
+
+    async function loadTemplate(template) {
+      try {
+        await loadImage(template.url);
+        // Agregar textos por defecto según el template
+        addDefaultTextsForTemplate(template.name);
+      } catch (error) {
+        console.error('Error loading template:', error);
+        alert('No se pudo cargar esta plantilla. Intenta con otra.');
+      }
+    }
+
+    function addDefaultTextsForTemplate(templateName) {
+      // Limpiar textos existentes
+      layers = [];
+      selectedId = null;
+      
+      // Agregar textos por defecto según la plantilla
+      switch (templateName) {
+        case "Drake Hotline Bling":
+          layers.push({...makeLayer("NO"), y: stage.height * 0.25});
+          layers.push({...makeLayer("YES"), y: stage.height * 0.75});
+          break;
+        case "Two Buttons":
+          layers.push({...makeLayer("OPCIÓN A"), y: stage.height * 0.25, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("OPCIÓN B"), y: stage.height * 0.35, fontSize: Math.floor(stage.width * 0.04)});
+          break;
+        case "Distracted Boyfriend":
+          layers.push({...makeLayer("YO"), x: stage.width * 0.2, y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("ALGO NUEVO"), x: stage.width * 0.6, y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("MI RESPONSABILIDAD"), x: stage.width * 0.9, y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.03)});
+          break;
+        case "Change My Mind":
+          layers.push({...makeLayer("TU OPINIÓN CONTROVERSIAL"), y: stage.height * 0.65, fontSize: Math.floor(stage.width * 0.05)});
+          break;
+        case "Expanding Brain":
+          layers.push({...makeLayer("NIVEL 1"), x: stage.width * 0.7, y: stage.height * 0.15, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("NIVEL 2"), x: stage.width * 0.7, y: stage.height * 0.35, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("NIVEL 3"), x: stage.width * 0.7, y: stage.height * 0.55, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("NIVEL 4"), x: stage.width * 0.7, y: stage.height * 0.75, fontSize: Math.floor(stage.width * 0.04)});
+          break;
+        case "Woman Yelling at Cat":
+          layers.push({...makeLayer("MUJER ENOJADA"), x: stage.width * 0.25, y: stage.height * 0.1, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("GATO CONFUNDIDO"), x: stage.width * 0.75, y: stage.height * 0.1, fontSize: Math.floor(stage.width * 0.04)});
+          break;
+        case "Mocking SpongeBob":
+          layers.push({...makeLayer("texto normal"), y: stage.height * 0.1, fontSize: Math.floor(stage.width * 0.05)});
+          layers.push({...makeLayer("TeXtO bUrLóN"), y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.05)});
+          break;
+        case "This Is Fine":
+          layers.push({...makeLayer("THIS IS FINE"), y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.06)});
+          break;
+        case "Bernie I Am Once Again Asking":
+          layers.push({...makeLayer("I AM ONCE AGAIN ASKING"), y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.05)});
+          break;
+        case "UNO Draw 25 Cards":
+          layers.push({...makeLayer("HACER ALGO"), x: stage.width * 0.3, y: stage.height * 0.4, fontSize: Math.floor(stage.width * 0.03)});
+          layers.push({...makeLayer("DRAW 25"), x: stage.width * 0.7, y: stage.height * 0.7, fontSize: Math.floor(stage.width * 0.04)});
+          break;
+        case "Left Exit 12 Off Ramp":
+          layers.push({...makeLayer("LO QUE DEBERÍA HACER"), x: stage.width * 0.3, y: stage.height * 0.3, fontSize: Math.floor(stage.width * 0.03)});
+          layers.push({...makeLayer("LO QUE REALMENTE HAGO"), x: stage.width * 0.7, y: stage.height * 0.6, fontSize: Math.floor(stage.width * 0.03)});
+          break;
+        case "Running Away Balloon":
+          layers.push({...makeLayer("YO"), x: stage.width * 0.2, y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.04)});
+          layers.push({...makeLayer("MIS RESPONSABILIDADES"), x: stage.width * 0.5, y: stage.height * 0.85, fontSize: Math.floor(stage.width * 0.03)});
+          layers.push({...makeLayer("ALGO DIVERTIDO"), x: stage.width * 0.8, y: stage.height * 0.3, fontSize: Math.floor(stage.width * 0.03)});
+          break;
+        default:
+          layers.push({...makeLayer("TEXTO SUPERIOR"), y: stage.height * 0.1});
+          layers.push({...makeLayer("TEXTO INFERIOR"), y: stage.height * 0.9});
+          break;
+      }
+      
+      // Seleccionar la primera capa
+      if (layers.length > 0) {
+        selectedId = layers[0].id;
+        syncPropsFromLayer();
+      }
+      
+      refreshLayersUI();
+      draw();
+    }
+
+    // --------- Utilidades ---------
+    function setStageSize(w, h) {
+      stage.width = w;
+      stage.height = h;
+      applyZoom();
+    }
+
+    function applyZoom() {
+      const cssW = Math.round(stage.width * zoom);
+      const cssH = Math.round(stage.height * zoom);
+      stage.style.width = cssW + "px";
+      stage.style.height = cssH + "px";
+      zoomLabel.textContent = Math.round(zoom * 100) + "%";
+      draw();
+    }
+
+    function wrapLines(text, maxWidth) {
+      const words = text.split(/\s+/);
+      const lines = [];
+      let line = "";
+      for (const w of words) {
+        const test = line ? line + " " + w : w;
+        const m = ctx.measureText(test);
+        if (m.width <= maxWidth) {
+          line = test;
+        } else {
+          if (line) lines.push(line);
+          line = w;
+        }
+      }
+      if (line) lines.push(line);
+      // Soporta saltos manuales \n
+      return lines.flatMap(l => String(l).split("\n"));
+    }
+
+    function drawTextLayer(L) {
+      ctx.save();
+      ctx.textAlign = L.align;
+      ctx.textBaseline = "top";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = L.strokeW;
+
+      ctx.font = `${L.fontSize}px ${L.fontFamily}`;
+      const maxW = (stage.width * (L.maxWpct/100));
+      const lines = wrapLines(L.text, maxW);
+
+      // medir alto total
+      const metrics = ctx.measureText("M");
+      const lineH = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent + 8;
+      const blockH = lines.length * lineH;
+
+      // calcular x de inicio según alineación
+      const x =
+        L.align === "left" ? L.x :
+        L.align === "right" ? L.x :
+        L.x; // para center igual
+
+      // fondo (opcional)
+      if (L.bgA > 0) {
+        const padX = 16, padY = 10;
+        // calcular ancho máximo de las líneas
+        const widths = lines.map(t => ctx.measureText(t).width);
+        const maxLineW = Math.max(...widths, 0);
+        let leftX = x;
+        if (L.align === "center") leftX = x - maxLineW/2;
+        if (L.align === "right")  leftX = x - maxLineW;
+        ctx.fillStyle = hexToRgba(L.bg, L.bgA/100);
+        roundRect(ctx, leftX - padX, L.y - padY, maxLineW + padX*2, blockH + padY*2, 8);
+        ctx.fill();
+      }
+
+      // texto
+      ctx.fillStyle = L.fill;
+      ctx.strokeStyle = L.stroke;
+
+      let y = L.y;
+      for (const t of lines) {
+        if (L.strokeW > 0) ctx.strokeText(t, x, y);
+        ctx.fillText(t, x, y);
+        y += lineH;
+      }
+
+      ctx.restore();
+    }
+
+    function hexToRgba(hex, alpha) {
+      const n = hex.replace("#","");
+      const bigint = parseInt(n.length===3 ? n.split("").map(c=>c+c).join("") : n, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.lineTo(x+w-r, y);
+      ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+      ctx.lineTo(x+w, y+h-r);
+      ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+      ctx.lineTo(x+r, y+h);
+      ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+      ctx.lineTo(x, y+r);
+      ctx.quadraticCurveTo(x, y, x+r, y);
+      ctx.closePath();
+    }
+
+    function draw() {
+      // Fondo gris si no hay imagen
+      ctx.clearRect(0,0,stage.width, stage.height);
+      if (image.complete && image.naturalWidth) {
+        ctx.drawImage(image, 0, 0, stage.width, stage.height);
+      } else {
+        ctx.fillStyle = "#f3f4f6";
+        ctx.fillRect(0,0,stage.width, stage.height);
+        // Mensaje de placeholder
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "24px Inter";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Selecciona una plantilla o carga una imagen", stage.width/2, stage.height/2);
+      }
+      // Capas
+      for (const L of layers) drawTextLayer(L);
+
+      // Marcar seleccionada
+      if (selectedId) {
+        const L = layers.find(l => l.id === selectedId);
+        if (L) drawSelectionBox(L);
+      }
+    }
+
+    function drawSelectionBox(L) {
+      ctx.save();
+      ctx.font = `${L.fontSize}px ${L.fontFamily}`;
+      const maxW = stage.width * (L.maxWpct/100);
+      const lines = wrapLines(L.text, maxW);
+      const metrics = ctx.measureText("M");
+      const lineH = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent + 8;
+      const heights = lines.length * lineH;
+      const widths = lines.map(t => ctx.measureText(t).width);
+      const maxLineW = Math.max(...widths, 0);
+
+      let leftX = L.x;
+      if (L.align === "center") leftX = L.x - maxLineW/2;
+      if (L.align === "right")  leftX = L.x - maxLineW;
+
+      ctx.strokeStyle = "rgba(59,130,246,0.9)"; // azul tailwind-500
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6,4]);
+      ctx.strokeRect(leftX - 10, L.y - 10, maxLineW + 20, heights + 20);
+      ctx.restore();
+    }
+
+    function refreshLayersUI() {
+      layersDiv.innerHTML = "";
+      if (layers.length === 0) {
+        layersDiv.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No hay capas de texto.<br>Haz clic en "Agregar Texto"</p>';
+        return;
+      }
+      
+      layers.slice().reverse().forEach((L, idx) => {
+        const btn = document.createElement('button');
+        const isSelected = L.id === selectedId;
+        btn.className = "w-full text-left px-3 py-2 rounded-lg border flex justify-between items-center transition-colors " +
+          (isSelected ? "bg-blue-50 border-blue-400 text-blue-900" : "bg-white hover:bg-gray-50 border-gray-200");
+        
+        const textPreview = L.text.length ? (L.text.length>25?L.text.slice(0,25)+"…":L.text) : "(sin texto)";
+        btn.innerHTML = `
+          <span class="font-medium">${textPreview}</span>
+          <span class="text-xs text-gray-500">${L.fontFamily}</span>
+        `;
+        btn.title = "Capa de texto (click para seleccionar)";
+        btn.onclick = () => { 
+          selectedId = L.id; 
+          syncPropsFromLayer(); 
+          draw(); 
+          refreshLayersUI(); 
+        };
+        layersDiv.appendChild(btn);
+      });
+    }
+
+    function syncPropsFromLayer() {
+      const L = layers.find(l => l.id === selectedId);
+      if (!L) return;
+      propText.value   = L.text;
+      propFont.value   = L.fontFamily;
+      propSize.value   = L.fontSize;
+      propFill.value   = L.fill;
+      propStroke.value = L.stroke;
+      propStrokeW.value= L.strokeW;
+      propMaxW.value   = L.maxWpct;
+      propBg.value     = L.bg;
+      propBgA.value    = L.bgA;
+    }
+
+    function syncLayerFromProps() {
+      const L = layers.find(l => l.id === selectedId);
+      if (!L) return;
+      L.text     = propText.value;
+      L.fontFamily = propFont.value;
+      L.fontSize = +propSize.value;
+      L.fill     = propFill.value;
+      L.stroke   = propStroke.value;
+      L.strokeW  = +propStrokeW.value;
+      L.maxWpct  = +propMaxW.value;
+      L.bg       = propBg.value;
+      L.bgA      = +propBgA.value;
+      draw();
+      refreshLayersUI();
+    }
+
+    // --------- Interacción: arrastrar ---------
+    let drag = null; // {id, dx, dy}
+    function hitTest(x, y) {
+      // convertir coords visuales -> reales (por zoom)
+      const rx = x / zoom, ry = y / zoom;
+      // probar de arriba hacia abajo (última capa arriba)
+      for (let i=layers.length-1; i>=0; i--) {
+        const L = layers[i];
+        ctx.font = `${L.fontSize}px ${L.fontFamily}`;
+        const maxW = stage.width * (L.maxWpct/100);
+        const lines = wrapLines(L.text, maxW);
+        const metrics = ctx.measureText("M");
+        const lineH = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent + 8;
+        const blockH = lines.length * lineH;
+        const widths = lines.map(t => ctx.measureText(t).width);
+        const w = Math.max(...widths, 0);
+        let leftX = L.x;
+        if (L.align === "center") leftX = L.x - w/2;
+        if (L.align === "right")  leftX = L.x - w;
+        const box = {x:leftX-10, y:L.y-10, w:w+20, h:blockH+20};
+        if (rx >= box.x && rx <= box.x+box.w && ry >= box.y && ry <= box.y+box.h) {
+          return {id: L.id, box};
+        }
+      }
+      return null;
+    }
+
+    stage.addEventListener('pointerdown', (e) => {
+      const rect = stage.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      const hit = hitTest(x, y);
+      if (hit) {
+        selectedId = hit.id;
+        const L = layers.find(l=>l.id===hit.id);
+        drag = { id: hit.id, dx: (x/zoom) - L.x, dy: (y/zoom) - L.y };
+        stage.setPointerCapture(e.pointerId);
+        stage.classList.add('dragging');
+        syncPropsFromLayer();
+        refreshLayersUI();
+        draw();
+      } else {
+        selectedId = null;
+        refreshLayersUI();
+        draw();
+      }
+    });
+
+    stage.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const rect = stage.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      const L = layers.find(l=>l.id===drag.id);
+      if (!L) return;
+      L.x = (x/zoom) - drag.dx;
+      L.y = (y/zoom) - drag.dy;
+      draw();
+    });
+
+    stage.addEventListener('pointerup', (e) => {
+      drag = null;
+      stage.classList.remove('dragging');
+      stage.releasePointerCapture?.(e.pointerId);
+    });
+
+    // --------- Eventos UI ---------
+    loadImgBtn.addEventListener('click', async () => {
+      const url = imgUrl.value.trim();
+      if (!url) return alert("Pega una URL válida.");
+      try {
+        await loadImage(url);
+      } catch (error) {
+        alert("No se pudo cargar la imagen. Verifica la URL o prueba con otra imagen.");
+      }
+    });
+
+    zoomRange.addEventListener('input', (e) => {
+      zoom = +e.target.value / 100;
+      applyZoom();
+    });
+
+    addTextBtn.addEventListener('click', () => {
+      const L = makeLayer("TEXTO DE MEME");
+      layers.push(L);
+      selectedId = L.id;
+      refreshLayersUI();
+      syncPropsFromLayer();
+      draw();
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!image.complete || !image.naturalWidth) {
+        alert("Primero carga una imagen o selecciona una plantilla.");
+        return;
+      }
+      
+      // IMPORTANTE: Desseleccionar temporalmente para que no aparezca la línea azul
+      const tempSelectedId = selectedId;
+      selectedId = null;
+      
+      // Redibujar sin la selección
+      draw();
+      
+      // Para descargar, necesitamos el canvas a 1x (no CSS zoom)
+      const link = document.createElement('a');
+      link.download = 'meme.png';
+      link.href = stage.toDataURL('image/png');
+      link.click();
+      
+      // Restaurar la selección
+      selectedId = tempSelectedId;
+      draw();
+      
+      // Mostrar mensaje de éxito
+      const originalText = downloadBtn.innerHTML;
+      downloadBtn.innerHTML = '✅ Descargado!';
+      downloadBtn.disabled = true;
+      setTimeout(() => {
+        downloadBtn.innerHTML = originalText;
+        downloadBtn.disabled = false;
+      }, 2000);
+    });
+
+    clearAllBtn.addEventListener('click', () => {
+      if (layers.length === 0) return;
+      if (confirm('¿Estás seguro de que quieres eliminar todas las capas de texto?')) {
+        layers = [];
+        selectedId = null;
+        refreshLayersUI();
+        draw();
+      }
+    });
+
+    [propText, propFont, propSize, propFill, propStroke, propStrokeW, propMaxW, propBg]
+      .forEach(el => el.addEventListener('input', syncLayerFromProps));
+    propBgA.addEventListener('input', syncLayerFromProps);
+
+    alignBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const L = layers.find(l=>l.id===selectedId);
+        if (!L) return;
+        L.align = btn.dataset.align;
+        draw();
+      });
+    });
+
+    toFrontBtn.addEventListener('click', () => {
+      const i = layers.findIndex(l=>l.id===selectedId);
+      if (i<0) return;
+      const [L] = layers.splice(i,1);
+      layers.push(L);
+      refreshLayersUI(); draw();
+    });
+    
+    toBackBtn.addEventListener('click', () => {
+      const i = layers.findIndex(l=>l.id===selectedId);
+      if (i<0) return;
+      const [L] = layers.splice(i,1);
+      layers.unshift(L);
+      refreshLayersUI(); draw();
+    });
+
+    deleteLayerBtn.addEventListener('click', () => {
+      if (!selectedId) return;
+      if (confirm('¿Eliminar esta capa de texto?')) {
+        layers = layers.filter(l=>l.id!==selectedId);
+        selectedId = null;
+        refreshLayersUI(); 
+        draw();
+      }
+    });
+
+    // --------- Carga de imagen ---------
+    async function loadImage(url) {
+      // Esperar fuentes para que mida bien
+      await document.fonts.ready;
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          image = img;
+          setStageSize(img.naturalWidth, img.naturalHeight);
+          resolve();
+        };
+        img.onerror = (e) => {
+          reject(e);
+        };
+        img.src = url;
+      });
+    }
+
+    // --------- Inicialización ---------
+    setStageSize(baseWidth, baseHeight);
+    createTemplatesGrid();
+    refreshLayersUI();
+    draw();
+
+    // --------- Atajos de teclado ---------
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      switch(e.key) {
+        case 'Delete':
+        case 'Backspace':
+          if (selectedId) {
+            deleteLayerBtn.click();
+            e.preventDefault();
+          }
+          break;
+        case 'Escape':
+          selectedId = null;
+          refreshLayersUI();
+          draw();
+          break;
+        case '+':
+        case '=':
+          addTextBtn.click();
+          e.preventDefault();
+          break;
+      }
+    });
+
+    // --------- Mejoras de UX ---------
+    // Auto-focus en textarea cuando se selecciona una capa
+    const originalSyncPropsFromLayer = syncPropsFromLayer;
+    syncPropsFromLayer = function() {
+      originalSyncPropsFromLayer();
+      if (selectedId) {
+        setTimeout(() => propText.focus(), 100);
+      }
+    };
+
+    // Placeholder mejorado cuando no hay imagen
+    function drawPlaceholder() {
+      ctx.save();
+      ctx.fillStyle = "#f9fafb";
+      ctx.fillRect(0, 0, stage.width, stage.height);
+      
+      // Patrón de cuadrícula sutil
+      ctx.strokeStyle = "#f3f4f6";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < stage.width; x += 50) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, stage.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < stage.height; y += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(stage.width, y);
+        ctx.stroke();
+      }
+      
+      // Mensaje central
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "24px Inter";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🖼️ Selecciona una plantilla arriba", stage.width/2, stage.height/2 - 30);
+      ctx.font = "16px Inter";
+      ctx.fillText("o pega la URL de tu imagen", stage.width/2, stage.height/2 + 10);
+      ctx.restore();
+    }
+
+    // Actualizar función draw para usar el placeholder mejorado
+    const originalDraw = draw;
+    draw = function() {
+      ctx.clearRect(0,0,stage.width, stage.height);
+      if (image.complete && image.naturalWidth) {
+        ctx.drawImage(image, 0, 0, stage.width, stage.height);
+      } else {
+        drawPlaceholder();
+      }
+      
+      // Capas
+      for (const L of layers) drawTextLayer(L);
+
+      // Marcar seleccionada
+      if (selectedId) {
+        const L = layers.find(l => l.id === selectedId);
+        if (L) drawSelectionBox(L);
+      }
+    };
+
+    // Redraw inicial
+    draw();
+  </script>
+</body>
+</html>
